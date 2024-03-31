@@ -1,6 +1,7 @@
 package jsonmodifier
 
 import (
+	"bytes"
 	"encoding/json"
 	"strings"
 
@@ -39,38 +40,56 @@ type Field struct {
 	Children map[string]*Field
 }
 
-func (me *jsonModifier) processValue(v gjson.Result, fields map[string]*Field) any {
+func (me *jsonModifier) processValue(v gjson.Result, fields map[string]*Field, buf *bytes.Buffer) {
 	if v.IsObject() {
-		reply := make(map[string]any)
+		buf.WriteByte('{')
+		isFirst := true
 		for k, v1 := range v.Map() {
 			if me.typ == ModifyTypeOnly {
 				if f, ok := fields[k]; ok {
-					if f.Children != nil {
-						reply[k] = me.processValue(v1, f.Children)
+					if isFirst {
+						isFirst = false
 					} else {
-						reply[k] = json.RawMessage(v1.Raw)
+						buf.WriteByte(',')
+					}
+					buf.WriteString(`"` + EncodeKey(k) + `":`)
+					if f.Children != nil {
+						me.processValue(v1, f.Children, buf)
+					} else {
+						buf.WriteString(v1.Raw)
 					}
 				}
 			} else {
 				if f, ok := fields[k]; ok {
 					if f.Children != nil {
-						reply[k] = me.processValue(v1, f.Children)
+						if isFirst {
+							isFirst = false
+						} else {
+							buf.WriteByte(',')
+						}
+						buf.WriteString(`"` + EncodeKey(k) + `":`)
+						me.processValue(v1, f.Children, buf)
 					}
 				} else {
-					reply[k] = json.RawMessage(v1.Raw)
+					if isFirst {
+						isFirst = false
+					} else {
+						buf.WriteByte(',')
+					}
+					buf.WriteString(`"` + EncodeKey(k) + `":` + v1.Raw)
 				}
 			}
 
 		}
-		return reply
+		buf.WriteByte('}')
 	} else if v.IsArray() {
-		reply := make([]any, 0)
+		buf.WriteByte('[')
 		for _, v1 := range v.Array() {
-			reply = append(reply, me.processValue(v1, fields))
+			me.processValue(v1, fields, buf)
 		}
-		return reply
+		buf.WriteByte(']')
 	} else {
-		return json.RawMessage(v.Raw)
+		buf.WriteString(v.Raw)
 	}
 }
 
@@ -96,8 +115,14 @@ func (me *jsonModifier) MarshalJSON() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	v := gjson.ParseBytes(b)
-	reply := me.processValue(v, field.Children)
-	b, err = json.Marshal(reply)
-	return b, err
+	buf := bytes.NewBuffer(nil)
+	me.processValue(gjson.ParseBytes(b), field.Children, buf)
+	return buf.Bytes(), nil
+}
+
+func EncodeKey(key string) string {
+	//key = strings.ReplaceAll(key, `\`, `\\`)
+	//key = strings.ReplaceAll(key, `"`, `\\"`)
+	return key
+
 }

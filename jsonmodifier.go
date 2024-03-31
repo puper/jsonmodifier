@@ -48,7 +48,7 @@ func (me *jsonModifier) processValue(v gjson.Result, fields map[string]*Field) a
 					if f.Children != nil {
 						reply[k] = me.processValue(v1, f.Children)
 					} else {
-						reply[k] = v1.Value()
+						reply[k] = json.RawMessage(v1.Raw)
 					}
 				}
 			} else {
@@ -57,7 +57,7 @@ func (me *jsonModifier) processValue(v gjson.Result, fields map[string]*Field) a
 						reply[k] = me.processValue(v1, f.Children)
 					}
 				} else {
-					reply[k] = v1.Value()
+					reply[k] = json.RawMessage(v1.Raw)
 				}
 			}
 
@@ -70,7 +70,7 @@ func (me *jsonModifier) processValue(v gjson.Result, fields map[string]*Field) a
 		}
 		return reply
 	} else {
-		return v.Value()
+		return json.RawMessage(v.Raw)
 	}
 }
 

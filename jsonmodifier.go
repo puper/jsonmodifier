@@ -84,7 +84,13 @@ func (me *jsonModifier) processValue(v gjson.Result, fields map[string]*Field, b
 		buf.WriteByte('}')
 	} else if v.IsArray() {
 		buf.WriteByte('[')
+		isFirst := true
 		for _, v1 := range v.Array() {
+			if isFirst {
+				isFirst = false
+			} else {
+				buf.WriteByte(',')
+			}
 			me.processValue(v1, fields, buf)
 		}
 		buf.WriteByte(']')
